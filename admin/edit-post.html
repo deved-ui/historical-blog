@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Post - Historical Chronicles</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+    <style>
+        .edit-post {
+            padding-top: 60px;
+            min-height: 100vh;
+            background: #f5f6fa;
+        }
+        .edit-header {
+            background: #fff;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .edit-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .edit-form {
+            background: #fff;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .form-row {
+            margin-bottom: 1.5rem;
+        }
+        .form-row label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #2c3e50;
+        }
+        .form-row input[type="text"],
+        .form-row input[type="url"] {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        .tag-input {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .tag {
+            background: #e67e22;
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .tag button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 0;
+            font-size: 1rem;
+        }
+        .tag-input input {
+            border: none;
+            outline: none;
+            padding: 0.3rem;
+            flex: 1;
+        }
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        .save-btn {
+            background: #2ecc71;
+            color: white;
+        }
+        .cancel-btn {
+            background: #95a5a6;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <header class="edit-header">
+        <h1>Edit Post</h1>
+        <div>
+            <button class="action-btn cancel-btn" onclick="window.location.href='dashboard.html'">Cancel</button>
+            <button class="action-btn save-btn" onclick="savePost()">Save Post</button>
+        </div>
+    </header>
+
+    <main class="edit-post">
+        <div class="edit-container">
+            <form class="edit-form" id="postForm">
+                <div class="form-row">
+                    <label for="title">Title</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+
+                <div class="form-row">
+                    <label for="author">Author</label>
+                    <input type="text" id="author" name="author" required>
+                </div>
+
+                <div class="form-row">
+                    <label for="featuredImage">Featured Image URL</label>
+                    <input type="url" id="featuredImage" name="featuredImage" required>
+                </div>
+
+                <div class="form-row">
+                    <label for="excerpt">Excerpt</label>
+                    <textarea id="excerpt" name="excerpt" rows="3" style="width: 100%; padding: 0.8rem;"></textarea>
+                </div>
+
+                <div class="form-row">
+                    <label>Tags</label>
+                    <div class="tag-input" id="tagContainer">
+                        <input type="text" id="tagInput" placeholder="Add a tag and press Enter">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <label for="content">Content</label>
+                    <textarea id="content" name="content"></textarea>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <script>
+        // Initialize TinyMCE
+        tinymce.init({
+            selector: '#content',
+            plugins: 'anchor autolink charmap codesample emoticons image link lists media searchreplace table visualblocks wordcount',
+            toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table | align lineheight | numlist bullist indent outdent | emoticons charmap | removeformat',
+            height: 500
+        });
+
+        // Tag handling
+        const tagInput = document.getElementById('tagInput');
+        const tagContainer = document.getElementById('tagContainer');
+        const tags = new Set();
+
+        tagInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const tag = tagInput.value.trim();
+                if (tag && !tags.has(tag)) {
+                    addTag(tag);
+                    tagInput.value = '';
+                }
+            }
+        });
+
+        function addTag(tag) {
+            tags.add(tag);
+            const tagElement = document.createElement('span');
+            tagElement.className = 'tag';
+            tagElement.innerHTML = `
+                ${tag}
+                <button onclick="removeTag('${tag}', this.parentElement)">&times;</button>
+            `;
+            tagContainer.insertBefore(tagElement, tagInput);
+        }
+
+        function removeTag(tag, element) {
+            tags.delete(tag);
+            element.remove();
+        }
+
+        // Load existing post data if editing
+        async function loadPost() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const postId = urlParams.get('id');
+
+            if (postId) {
+                try {
+                    const response = await fetch(`/api/admin/posts/${postId}`, {
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                        }
+                    });
+
+                    if (response.ok) {
+                        const post = await response.json();
+                        document.getElementById('title').value = post.title;
+                        document.getElementById('author').value = post.author;
+                        document.getElementById('featuredImage').value = post.featuredImage;
+                        document.getElementById('excerpt').value = post.excerpt;
+                        tinymce.get('content').setContent(post.content);
+                        post.tags.forEach(addTag);
+                    }
+                } catch (error) {
+                    console.error('Error loading post:', error);
+                }
+            }
+        }
+
+        // Save post
+        async function savePost() {
+            const postData = {
+                title: document.getElementById('title').value,
+                author: document.getElementById('author').value,
+                featuredImage: document.getElementById('featuredImage').value,
+                excerpt: document.getElementById('excerpt').value,
+                content: tinymce.get('content').getContent(),
+                tags: Array.from(tags)
+            };
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const postId = urlParams.get('id');
+            const url = postId ? `/api/admin/posts/${postId}` : '/api/admin/posts';
+            const method = postId ? 'PUT' : 'POST';
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                    },
+                    body: JSON.stringify(postData)
+                });
+
+                if (response.ok) {
+                    window.location.href = 'dashboard.html';
+                } else {
+                    alert('Failed to save post');
+                }
+            } catch (error) {
+                console.error('Error saving post:', error);
+                alert('Error saving post');
+            }
+        }
+
+        // Check authentication
+        const token = localStorage.getItem('adminToken');
+        if (!token) {
+            window.location.href = '/admin/login.html';
+        }
+
+        // Load post data if editing
+        loadPost();
+    </script>
+</body>
+</html>
